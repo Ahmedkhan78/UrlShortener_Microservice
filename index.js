@@ -14,7 +14,6 @@ let idCounter = 1;
 // Middleware
 app.use(cors());
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
 app.use("/public", express.static(`${process.cwd()}/public`));
 
 // Homepage
@@ -22,23 +21,24 @@ app.get("/", function (req, res) {
   res.sendFile(process.cwd() + "/views/index.html");
 });
 
-// ✅ POST URL to be shortened
+// POST URL
 app.post("/api/shorturl", function (req, res) {
   const originalUrl = req.body.url;
   const parsedUrl = urlParser.parse(originalUrl);
+  const hostname = parsedUrl.hostname;
 
-  // Basic URL format validation
+  // Validate URL format
   if (!/^https?:\/\/[\w.-]+\.[a-z]{2,}/i.test(originalUrl)) {
     return res.json({ error: "invalid url" });
   }
 
-  // DNS lookup to check if domain exists
-  dns.lookup(parsedUrl.hostname, (err) => {
+  // DNS check
+  dns.lookup(hostname, (err) => {
     if (err) {
       return res.json({ error: "invalid url" });
     }
 
-    // Check if URL already exists
+    // Check if already in DB
     const existing = Object.entries(urlDatabase).find(
       ([key, value]) => value === originalUrl
     );
@@ -49,7 +49,6 @@ app.post("/api/shorturl", function (req, res) {
       });
     }
 
-    // Save to database
     const shortUrl = idCounter++;
     urlDatabase[shortUrl] = originalUrl;
 
@@ -57,13 +56,13 @@ app.post("/api/shorturl", function (req, res) {
   });
 });
 
-// ✅ Redirect by short URL
+// Redirect by short_url
 app.get("/api/shorturl/:short_url", function (req, res) {
-  const shortUrl = req.params.short_url;
+  const shortUrl = Number(req.params.short_url);
   const originalUrl = urlDatabase[shortUrl];
 
   if (originalUrl) {
-    res.redirect(originalUrl);
+    res.redirect(301, originalUrl); // Use 301 for permanent redirect
   } else {
     res.status(404).json({ error: "No short URL found for the given input" });
   }
