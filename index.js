@@ -2,12 +2,11 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const dns = require("dns");
-const urlParser = require("url");
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// In-memory storage
+// In-memory URL store
 let urlDatabase = {};
 let idCounter = 1;
 
@@ -21,24 +20,26 @@ app.get("/", function (req, res) {
   res.sendFile(process.cwd() + "/views/index.html");
 });
 
-// POST URL
+// ✅ POST endpoint to shorten a URL
 app.post("/api/shorturl", function (req, res) {
   const originalUrl = req.body.url;
-  const parsedUrl = urlParser.parse(originalUrl);
-  const hostname = parsedUrl.hostname;
+  let hostname;
 
-  // Validate URL format
-  if (!/^https?:\/\/[\w.-]+\.[a-z]{2,}/i.test(originalUrl)) {
+  // ✅ Use modern URL parser
+  try {
+    const parsedUrl = new URL(originalUrl);
+    hostname = parsedUrl.hostname;
+  } catch (err) {
     return res.json({ error: "invalid url" });
   }
 
-  // DNS check
+  // ✅ DNS lookup to validate domain
   dns.lookup(hostname, (err) => {
     if (err) {
       return res.json({ error: "invalid url" });
     }
 
-    // Check if already in DB
+    // ✅ Check if already exists
     const existing = Object.entries(urlDatabase).find(
       ([key, value]) => value === originalUrl
     );
@@ -49,6 +50,7 @@ app.post("/api/shorturl", function (req, res) {
       });
     }
 
+    // ✅ Save new short URL
     const shortUrl = idCounter++;
     urlDatabase[shortUrl] = originalUrl;
 
@@ -56,13 +58,13 @@ app.post("/api/shorturl", function (req, res) {
   });
 });
 
-// Redirect by short_url
+// ✅ Redirect endpoint
 app.get("/api/shorturl/:short_url", function (req, res) {
   const shortUrl = Number(req.params.short_url);
   const originalUrl = urlDatabase[shortUrl];
 
   if (originalUrl) {
-    res.redirect(301, originalUrl); // Use 301 for permanent redirect
+    res.redirect(301, originalUrl);
   } else {
     res.status(404).json({ error: "No short URL found for the given input" });
   }
